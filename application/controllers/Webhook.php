@@ -82,4 +82,145 @@ class Webhook extends CI_Controller {
     }
   }
 
+  private function textMessage($event)
+
+{
+
+    $userMessage = $event['message']['text'];
+
+
+    if($this->user['number'] == 0)
+
+    {
+
+        if(strtolower($userMessage) == 'mulai')
+
+        {
+
+            // reset score
+
+            $this->tebakkode_m->setScore($this->user['user_id'], 0);
+
+
+            // update number progress
+
+            $this->tebakkode_m->setUserProgress($this->user['user_id'], 1);
+
+
+            // send question no.1
+
+            $this->sendQuestion($this->user['user_id'], 1);
+
+
+        } else {
+
+            $message = 'Silakan kirim pesan "MULAI" untuk memulai kuis.';
+
+            $textMessageBuilder = new TextMessageBuilder($message);
+
+            $this->bot->pushMessage($event['source']['userId'], $textMessageBuilder);
+
+        }
+
+
+        // if user already begin test
+
+    } else {
+
+        $this->checkAnswer($userMessage);
+
+    }
+
+}
+
+public function sendQuestion($user_id, $questionNum = 1)
+
+{
+
+    // get question from database
+
+    $question = $this->tebakkode_m->getQuestion($questionNum);
+
+
+    // prepare answer options
+
+    for($opsi = "a"; $opsi <= "d"; $opsi++) {
+
+        if(!empty($question['option_'.$opsi]))
+
+            $options[] = new MessageTemplateActionBuilder($question['option_'.$opsi], $question['option_'.$opsi]);
+
+    }
+
+
+    // prepare button template
+
+    $buttonTemplate = new ButtonTemplateBuilder($question['number']."/10", $question['text'], $question['image'], $options);
+
+
+    // build message
+
+    $messageBuilder = new TemplateMessageBuilder("Gunakan mobile app untuk melihat soal", $buttonTemplate);
+
+
+    // send message
+
+    $response = $this->bot->pushMessage($user_id, $messageBuilder);
+
+}
+
+private function checkAnswer($message)
+
+{
+
+    // if answer is true, increment score
+
+    if($this->tebakkode_m->isAnswerEqual($this->user['number'], $message)){
+
+        $this->user['score']++;
+
+        $this->tebakkode_m->setScore($this->user['user_id'], $this->user['score']);
+
+    }
+
+
+    if($this->user['number'] < 10)
+
+    {
+
+        // update number progress
+
+        $this->tebakkode_m->setUserProgress($this->user['user_id'], $this->user['number'] + 1);
+
+
+        // send next number
+
+        $this->sendQuestion($this->user['user_id'], $this->user['number'] + 1);
+
+    }
+
+
+    else {
+
+        // show user score
+
+        $message = 'Skormu '. $this->user['score'];
+
+        $textMessageBuilder = new TextMessageBuilder($message);
+
+        $this->bot->pushMessage($this->user['user_id'], $textMessageBuilder);
+
+
+
+        $textMessageBuilder = new TextMessageBuilder($message);
+
+        $this->bot->pushMessage($this->user['user_id'], $textMessageBuilder);
+
+
+        $this->tebakkode_m->setUserProgress($this->user['user_id'], 0);
+
+    }
+
+}
+
 }
